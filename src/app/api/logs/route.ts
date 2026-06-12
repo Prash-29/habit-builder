@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
-import DailyLog from "@/models/DailyLog";
+import HabitLog from "@/models/HabitLog";
+import { GYM_HABIT_ID } from "@/lib/constants";
 
 // Normalize a date to midnight UTC for consistent daily grouping
 function toMidnightUTC(date: Date): Date {
@@ -9,12 +10,13 @@ function toMidnightUTC(date: Date): Date {
   );
 }
 
-// GET /api/logs?userId=...&date=YYYY-MM-DD  (or omit date for today)
+// GET /api/logs?userId=...&habitId=...&date=YYYY-MM-DD  (date/habitId optional)
 export async function GET(req: NextRequest) {
   await connectDB();
 
   const { searchParams } = req.nextUrl;
   const userId = searchParams.get("userId");
+  const habitId = searchParams.get("habitId") || GYM_HABIT_ID;
   const dateParam = searchParams.get("date");
 
   if (!userId) {
@@ -23,55 +25,55 @@ export async function GET(req: NextRequest) {
 
   const date = toMidnightUTC(dateParam ? new Date(dateParam) : new Date());
 
-  const log = await DailyLog.findOne({ userId, date }).lean();
+  const log = await HabitLog.findOne({ userId, habitId, date }).lean();
 
-  return NextResponse.json(log ?? { userId, date, entries: [] });
+  return NextResponse.json(
+    log ?? { userId, habitId, date, completed: false, durationMin: 0, description: "", note: "", data: {} }
+  );
 }
 
-// PATCH /api/logs — upsert today's entry for a habit
-// Body: { userId, habitId, completed, note? }
+// PATCH /api/logs — upsert today's log for a habit
+// Body: { userId, habitId?, completed, durationMin?, description?, note?, data? }
 export async function PATCH(req: NextRequest) {
   await connectDB();
 
   const body = await req.json();
-  const { userId, habitId, completed, note } = body;
+  const {
+    userId,
+    habitId = GYM_HABIT_ID,
+    completed,
+    durationMin,
+    description,
+    note,
+    data,
+  } = body;
 
-  if (!userId || !habitId || completed === undefined) {
+  if (!userId || completed === undefined) {
     return NextResponse.json(
-      { error: "userId, habitId, and completed are required" },
+      { error: "userId and completed are required" },
       { status: 400 }
     );
   }
 
   const today = toMidnightUTC(new Date());
+  const safeDuration = Number.isFinite(Number(durationMin))
+    ? Math.max(0, Number(durationMin))
+    : 0;
 
-  const log = await DailyLog.findOneAndUpdate(
-    { userId, date: today },
+  const log = await HabitLog.findOneAndUpdate(
+    { userId, habitId, date: today },
     {
       $set: {
-        "entries.$[entry].completed": completed,
-        "entries.$[entry].completedAt": completed ? new Date() : null,
-        "entries.$[entry].note": note ?? "",
+        completed,
+        durationMin: safeDuration,
+        description: description ?? "",
+        note: note ?? "",
+        // Replace whole `data` object — Mixed isn't change-tracked per key.
+        data: data && typeof data === "object" ? data : {},
       },
     },
-    {
-      arrayFilters: [{ "entry.habitId": habitId }],
-      upsert: true,
-      new: true,
-      setDefaultsOnInsert: true,
-    }
+    { upsert: true, new: true, setDefaultsOnInsert: true }
   );
-
-  // If entry didn't exist yet, push it
-  if (!log.entries.find((e) => e.habitId.toString() === habitId)) {
-    log.entries.push({
-      habitId,
-      completed,
-      completedAt: completed ? new Date() : undefined,
-      note: note ?? "",
-    });
-    await log.save();
-  }
 
   return NextResponse.json(log);
 }

@@ -7,14 +7,17 @@ if (!MONGODB_URI) {
 }
 
 // Cache the connection across hot-reloads in development
-let cached = (global as any).mongoose as {
+interface MongooseCache {
   conn: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
+}
+
+const globalCache = global as typeof globalThis & {
+  mongoose?: MongooseCache;
 };
 
-if (!cached) {
-  cached = (global as any).mongoose = { conn: null, promise: null };
-}
+const cached: MongooseCache =
+  globalCache.mongoose ?? (globalCache.mongoose = { conn: null, promise: null });
 
 export async function connectDB() {
   if (cached.conn) return cached.conn;

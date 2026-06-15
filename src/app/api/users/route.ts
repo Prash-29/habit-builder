@@ -63,9 +63,15 @@ export async function POST(request: NextRequest) {
       contact: resolvedContact,
     });
 
-    // Send welcome email only if a real email was provided
+    // Send welcome email only if a real email was provided.
+    // Non-blocking: a mail failure (bad creds, SMTP down) must NOT fail
+    // registration — the user is already created.
     if (email) {
-      await sendWelcomeEmail(email, resolvedName);
+      try {
+        await sendWelcomeEmail(email, resolvedName);
+      } catch (mailErr) {
+        console.error("Welcome email failed (registration still succeeded):", mailErr);
+      }
     }
 
     return NextResponse.json({ success: true, data: user }, { status: 201 });

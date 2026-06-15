@@ -1,0 +1,34 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    # GMAIL_USER / GMAIL_APP_PASSWORD are read from .env.local.
+    # MONGODB_URI below overrides the localhost value in .env.local so the
+    # app talks to the `mongo` service over the compose network.
+    env_file:
+      - .env.local
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/nextjs-mongo
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    # Host 27018 → container 27017 (avoids clash with a local mongod on 27017).
+    # The app does NOT use this; it reaches mongo over the compose network.
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  mongo_data:

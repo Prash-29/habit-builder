@@ -32,8 +32,8 @@ export async function GET(req: NextRequest) {
   );
 }
 
-// PATCH /api/logs — upsert today's log for a habit
-// Body: { userId, habitId?, completed, durationMin?, description?, note?, data? }
+// PATCH /api/logs — upsert today's log for a habit (an entry means "done")
+// Body: { userId, habitId?, durationMin?, description?, note?, data? }
 export async function PATCH(req: NextRequest) {
   await connectDB();
 
@@ -41,18 +41,14 @@ export async function PATCH(req: NextRequest) {
   const {
     userId,
     habitId = GYM_HABIT_ID,
-    completed,
     durationMin,
     description,
     note,
     data,
   } = body;
 
-  if (!userId || completed === undefined) {
-    return NextResponse.json(
-      { error: "userId and completed are required" },
-      { status: 400 }
-    );
+  if (!userId) {
+    return NextResponse.json({ error: "userId is required" }, { status: 400 });
   }
 
   const today = toMidnightUTC(new Date());
@@ -64,7 +60,8 @@ export async function PATCH(req: NextRequest) {
     { userId, habitId, date: today },
     {
       $set: {
-        completed,
+        // Making an entry means the user went — no separate toggle.
+        completed: true,
         durationMin: safeDuration,
         description: description ?? "",
         note: note ?? "",

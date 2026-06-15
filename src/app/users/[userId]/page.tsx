@@ -2,15 +2,14 @@
 
 import { useState, useEffect, useCallback, use } from "react";
 import axios from "axios";
-import { Button, Input, InputNumber, Popover, Select, Switch, message } from "antd";
+import { Button, Input, InputNumber, Popover, Select, message } from "antd";
 import { GYM_HABIT_ID, WORKOUT_TYPES } from "@/lib/constants";
 
 interface DayPerformance {
   date: string;
   dayName: string;
   dayNum: number;
-  completed: boolean;
-  logged: boolean;
+  logged: boolean;   // a log exists for this day == went to gym
   isToday: boolean;
   // detail for hover popover
   durationMin: number;
@@ -20,7 +19,6 @@ interface DayPerformance {
 }
 
 interface GymForm {
-  completed: boolean;
   durationMin: number;
   description: string;
   note: string;
@@ -28,7 +26,6 @@ interface GymForm {
 }
 
 const EMPTY_FORM: GymForm = {
-  completed: false,
   durationMin: 0,
   description: "",
   note: "",
@@ -38,7 +35,6 @@ const EMPTY_FORM: GymForm = {
 // Flat HabitLog row shape (only fields we read)
 interface LogRow {
   date: string;
-  completed: boolean;
   durationMin?: number;
   description?: string;
   note?: string;
@@ -73,7 +69,6 @@ export default function UserDashboard({
           date: d.toISOString().split("T")[0],
           dayName: d.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" }),
           dayNum: d.getUTCDate(),
-          completed: false,
           logged: false,
           isToday: i === 0,
           durationMin: 0,
@@ -93,7 +88,6 @@ export default function UserDashboard({
             const day = days.find((d) => d.date === logDate);
             if (day) {
               day.logged = true;
-              day.completed = !!log.completed;
               day.durationMin = log.durationMin ?? 0;
               day.description = log.description ?? "";
               day.note = log.note ?? "";
@@ -102,7 +96,6 @@ export default function UserDashboard({
             // Prefill today's form so the existing entry can be updated
             if (prefillForm && logDate === todayStr) {
               setForm({
-                completed: !!log.completed,
                 durationMin: log.durationMin ?? 0,
                 description: log.description ?? "",
                 note: log.note ?? "",
@@ -122,6 +115,9 @@ export default function UserDashboard({
   );
 
   useEffect(() => {
+    // loadWeek sets state only after an await (async fetch), not synchronously,
+    // so it does not cause the cascading render this rule guards against.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadWeek(true);
   }, [loadWeek]);
 
@@ -131,7 +127,6 @@ export default function UserDashboard({
       await axios.patch("/api/logs", {
         userId,
         habitId: GYM_HABIT_ID,
-        completed: form.completed,
         durationMin: form.durationMin,
         description: form.description,
         note: form.note,
@@ -147,10 +142,9 @@ export default function UserDashboard({
     }
   }
 
-  const completedDays = weekData.filter((d) => d.completed).length;
   const loggedDays = weekData.filter((d) => d.logged).length;
-  const successRate =
-    loggedDays > 0 ? Math.round((completedDays / loggedDays) * 100) : 0;
+  const totalMinutes = weekData.reduce((s, d) => s + d.durationMin, 0);
+  const avgMinutes = loggedDays > 0 ? Math.round(totalMinutes / loggedDays) : 0;
   const todayLogged = weekData.find((d) => d.isToday)?.logged ?? false;
 
   return (
@@ -165,17 +159,12 @@ export default function UserDashboard({
 
         {/* Today's Gym Log */}
         <div className="bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/20 mb-6">
-          <h2 className="text-white font-semibold mb-4 text-sm uppercase tracking-wider">
+          <h2 className="text-white font-semibold mb-1 text-sm uppercase tracking-wider">
             Today&apos;s Gym
           </h2>
-
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-blue-100 text-sm">Did you go to the gym?</span>
-            <Switch
-              checked={form.completed}
-              onChange={(v) => setForm((f) => ({ ...f, completed: v }))}
-            />
-          </div>
+          <p className="text-blue-300 text-xs mb-4">
+            Saving a log marks today as a gym day.
+          </p>
 
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
@@ -263,9 +252,9 @@ export default function UserDashboard({
         {/* Stats Row */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[
-            { label: "Gym Days", value: completedDays },
-            { label: "Logged", value: loggedDays },
-            { label: "Success Rate", value: `${successRate}%` },
+            { label: "Gym Days", value: loggedDays },
+            { label: "Total Min", value: totalMinutes },
+            { label: "Avg Min", value: avgMinutes },
           ].map((stat) => (
             <div
               key={stat.label}
@@ -294,17 +283,11 @@ export default function UserDashboard({
             <>
               <div className="grid grid-cols-7 gap-2">
                 {weekData.map((day) => {
-                  const bg = day.completed
-                    ? "bg-green-400"
-                    : day.logged
-                    ? "bg-red-400/70"
-                    : "bg-white/10";
+                  const bg = day.logged ? "bg-green-400" : "bg-white/10";
 
                   const popContent = day.logged ? (
                     <div className="text-xs leading-relaxed max-w-50">
-                      <p className="font-semibold mb-1">
-                        {day.completed ? "✅ Went to gym" : "❌ Skipped"}
-                      </p>
+                      <p className="font-semibold mb-1">✅ Went to gym</p>
                       {day.workoutType && <p>Type: {day.workoutType}</p>}
                       {day.durationMin > 0 && <p>Time: {day.durationMin} min</p>}
                       {day.description && <p>What: {day.description}</p>}
@@ -340,7 +323,6 @@ export default function UserDashboard({
               <div className="flex flex-wrap gap-3 mt-5 text-xs text-blue-300">
                 {[
                   { color: "bg-green-400", label: "Went" },
-                  { color: "bg-red-400/70", label: "Logged, skipped" },
                   { color: "bg-white/10", label: "No log" },
                 ].map((item) => (
                   <span key={item.label} className="flex items-center gap-1.5">

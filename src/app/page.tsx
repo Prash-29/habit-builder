@@ -197,9 +197,8 @@ export default function RegisterPage() {
 
               <Form.Item
                 name="phone"
-                label={<span className="text-blue-200 text-xs font-semibold tracking-wider uppercase">Phone Number</span>}
+                label={<span className="text-blue-200 text-xs font-semibold tracking-wider uppercase">Phone Number (optional)</span>}
                 rules={[
-                  { required: true, message: "Phone number is required." },
                   {
                     validator(_, value) {
                       if (!value) return Promise.resolve();

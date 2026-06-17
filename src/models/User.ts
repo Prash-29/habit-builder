@@ -25,7 +25,7 @@ const UserSchema = new Schema<IUser>(
     },
     contact: {
       type: String,
-      required: [true, "Contact is required"],
+      default: "",
       trim: true,
     },
   },

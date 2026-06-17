@@ -133,8 +133,8 @@ export default function RegisterPage() {
                   {
                     validator(_, value) {
                       if (!value) return Promise.resolve();
-                      if (value.length > 25)
-                        return Promise.reject("Must be 25 characters or less.");
+                      if (value.length > 254)
+                        return Promise.reject("Must be 254 characters or less.");
                       if (EMAIL_REGEX.test(value) || PHONE_REGEX.test(value))
                         return Promise.resolve();
                       return Promise.reject("Enter a valid email or phone number.");
@@ -144,7 +144,7 @@ export default function RegisterPage() {
               >
                 <Input
                   placeholder="you@example.com or 0712345678"
-                  maxLength={25}
+                  maxLength={254}
                   size="large"
                   className="rounded-xl bg-white/10 border-white/25 text-white placeholder:text-blue-300/60"
                 />
@@ -178,8 +178,8 @@ export default function RegisterPage() {
                   {
                     validator(_, value) {
                       if (!value) return Promise.resolve();
-                      if (value.length > 25)
-                        return Promise.reject("Email must be 25 characters or less.");
+                      if (value.length > 254)
+                        return Promise.reject("Email must be 254 characters or less.");
                       if (!EMAIL_REGEX.test(value))
                         return Promise.reject("Enter a valid email address.");
                       return Promise.resolve();
@@ -189,7 +189,7 @@ export default function RegisterPage() {
               >
                 <Input
                   placeholder="you@example.com"
-                  maxLength={25}
+                  maxLength={254}
                   size="large"
                   className="rounded-xl bg-white/10 border-white/25 text-white placeholder:text-blue-300/60"
                 />

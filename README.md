@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Habit Tracker
 
-## Getting Started
+A simple gym habit tracker — log your daily workout (type, time spent, notes) and see a 7-day overview.
 
-First, run the development server:
+**Live:** https://habit-builder-qglw.onrender.com/
+
+> Hosted on Render's free tier — the first request after idle may take ~50s to wake (cold start).
+
+## Stack
+
+- **Next.js 16** (App Router) + React 19, TypeScript
+- **MongoDB** via Mongoose (MongoDB Atlas in production)
+- **Ant Design** + Tailwind CSS
+- **Docker** (multi-stage, standalone output)
+
+## Features
+
+- Register with email (phone optional)
+- Log one gym entry per day — workout type, minutes, description, notes
+- Saving a log marks the day as "went" (one log per day, re-saving updates it)
+- Weekly grid with per-day hover details + stats (gym days, total/avg minutes)
+
+## Local development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+App → http://localhost:3000
+
+### Environment variables (`.env.local`)
+
+```
+MONGODB_URI=mongodb://localhost:27017/nextjs-mongo
+# Optional — welcome email via Resend HTTP API (SMTP is blocked on most free hosts)
+RESEND_API_KEY=
+RESEND_FROM=Habit Tracker <onboarding@resend.dev>
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Run with Docker
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+docker compose up --build
+```
+Starts the app + a MongoDB container. App → http://localhost:3000
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploy (Render + Atlas)
 
-## Learn More
+- DB: MongoDB Atlas free (M0) cluster → set `MONGODB_URI`
+- App: Render Web Service (Docker), branch `main`, instance type Free
+- Set env vars in the Render dashboard (`MONGODB_URI`, optional `RESEND_API_KEY`)
+- Auto-deploys on push to `main`
 
-To learn more about Next.js, take a look at the following resources:
+## API
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `GET /api/users` — list users; `?email=` / `?phone=` — find one
+- `POST /api/users` — register
+- `GET /api/logs?userId=&date=` — a day's log
+- `PATCH /api/logs` — upsert today's log
+- `GET /api/logs/week?userId=` — last 7 days

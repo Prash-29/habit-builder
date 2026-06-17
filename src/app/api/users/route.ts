@@ -64,14 +64,20 @@ export async function POST(request: NextRequest) {
     });
 
     // Send welcome email only if a real email was provided.
-    // Non-blocking: a mail failure (bad creds, SMTP down) must NOT fail
-    // registration — the user is already created.
+    // Fire-and-forget: do NOT await. Render free tier blocks outbound SMTP,
+    // so awaiting would hang the request until the socket times out and the
+    // client never gets a response (no redirect). The user is already saved;
+    // the email is best-effort. Render runs a persistent server, so this
+    // background promise still completes and logs.
     if (email) {
-      try {
-        await sendWelcomeEmail(email, resolvedName);
-      } catch (mailErr) {
-        console.error("Welcome email failed (registration still succeeded):", mailErr);
-      }
+      void sendWelcomeEmail(email, resolvedName).catch((mailErr) => {
+        const e = mailErr as { code?: string; command?: string; message?: string };
+        console.error("[mailer] welcome email FAILED (registration still succeeded)", {
+          code: e.code,        // e.g. ETIMEDOUT / ESOCKET if SMTP port blocked
+          command: e.command,
+          message: e.message,
+        });
+      });
     }
 
     return NextResponse.json({ success: true, data: user }, { status: 201 });

@@ -2,6 +2,10 @@ import nodemailer from "nodemailer";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
+  // Fail fast instead of hanging if the SMTP port is blocked (e.g. Render free tier).
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_APP_PASSWORD,
@@ -9,7 +13,12 @@ const transporter = nodemailer.createTransport({
 });
 
 export async function sendWelcomeEmail(toEmail: string, name: string) {
-  await transporter.sendMail({
+  console.log("[mailer] sending welcome email", {
+    to: toEmail,
+    gmailUserSet: Boolean(process.env.GMAIL_USER),
+    gmailPassSet: Boolean(process.env.GMAIL_APP_PASSWORD),
+  });
+  const info = await transporter.sendMail({
     from: `"Habit Tracker" <${process.env.GMAIL_USER}>`,
     to: toEmail,
     subject: "Welcome to Habit Tracker!",
@@ -31,4 +40,5 @@ export async function sendWelcomeEmail(toEmail: string, name: string) {
       </div>
     `,
   });
+  console.log("[mailer] welcome email sent", { messageId: info.messageId, response: info.response });
 }

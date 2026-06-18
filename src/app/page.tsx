@@ -17,14 +17,20 @@ interface LoginFields {
   identifier: string;
 }
 
+interface AdminFields {
+  email: string;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [registerForm] = Form.useForm<RegisterFields>();
   const [loginForm] = Form.useForm<LoginFields>();
+  const [adminForm] = Form.useForm<AdminFields>();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showLogin, setShowLogin] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
 
   // On mount: if userId in localStorage, go straight to dashboard
   useEffect(() => {
@@ -84,6 +90,23 @@ export default function RegisterPage() {
     }
   }
 
+  // --- Admin login (email checked against allowed list, no DB entry) ---
+  async function handleAdminLogin(values: AdminFields) {
+    setLoading(true);
+    setError("");
+
+    const email = values.email.trim();
+    try {
+      await axios.post("/api/admin/login", { email });
+      localStorage.setItem("adminEmail", email);
+      router.push("/admin-user-dashboard");
+    } catch (err) {
+      setLoading(false);
+      const axiosErr = err as AxiosError<{ error?: string }>;
+      setError(axiosErr.response?.data?.error || "Not an authorized admin.");
+    }
+  }
+
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-950 via-blue-800 to-blue-600 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -102,9 +125,15 @@ export default function RegisterPage() {
 
         {/* Card */}
         <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 shadow-2xl border border-white/20">
-          <h1 className="text-3xl font-bold text-white mb-1 text-center">Get Started</h1>
+          <h1 className="text-3xl font-bold text-white mb-1 text-center">
+            {showAdmin ? "Admin Login" : "Get Started"}
+          </h1>
           <p className="text-blue-200 text-center text-sm mb-7">
-            Register with your email and phone number
+            {showAdmin
+              ? "Enter your admin email to continue"
+              : showLogin
+              ? "Find your account"
+              : "Register with your email and phone number"}
           </p>
 
           {error && (
@@ -117,8 +146,51 @@ export default function RegisterPage() {
             />
           )}
 
-          {/* Register OR Login — ternary */}
-          {showLogin ? (
+          {/* Admin / Login / Register — ternary */}
+          {showAdmin ? (
+            <Form
+              form={adminForm}
+              layout="vertical"
+              onFinish={handleAdminLogin}
+              requiredMark={false}
+            >
+              <Form.Item
+                name="email"
+                label={<span className="text-blue-200 text-xs font-semibold tracking-wider uppercase">Admin Email</span>}
+                rules={[
+                  { required: true, message: "Admin email is required." },
+                  {
+                    validator(_, value) {
+                      if (!value) return Promise.resolve();
+                      if (!EMAIL_REGEX.test(value))
+                        return Promise.reject("Enter a valid email address.");
+                      return Promise.resolve();
+                    },
+                  },
+                ]}
+              >
+                <Input
+                  placeholder="admin@example.com"
+                  maxLength={254}
+                  size="large"
+                  className="rounded-xl bg-white/10 border-white/25 text-white placeholder:text-blue-300/60"
+                />
+              </Form.Item>
+
+              <Form.Item className="mb-0">
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={loading}
+                  block
+                  size="large"
+                  className="rounded-xl font-bold text-blue-800 bg-white hover:bg-blue-50! border-0 h-12"
+                >
+                  {loading ? "Checking..." : "Go to Dashboard"}
+                </Button>
+              </Form.Item>
+            </Form>
+          ) : showLogin ? (
             <Form
               form={loginForm}
               layout="vertical"
@@ -234,19 +306,35 @@ export default function RegisterPage() {
             </Form>
           )}
 
-          {/* Checkbox — below both forms */}
-          <div className="mt-5 border-t border-white/15 pt-4">
+          {/* Toggles — below the forms */}
+          <div className="mt-5 border-t border-white/15 pt-4 space-y-2">
+            {!showAdmin && (
+              <Checkbox
+                checked={showLogin}
+                onChange={(e) => {
+                  setShowLogin(e.target.checked);
+                  setError("");
+                  registerForm.resetFields();
+                  loginForm.resetFields();
+                }}
+                className="text-blue-200 text-sm"
+              >
+                I already have an account
+              </Checkbox>
+            )}
             <Checkbox
-              checked={showLogin}
+              checked={showAdmin}
               onChange={(e) => {
-                setShowLogin(e.target.checked);
+                setShowAdmin(e.target.checked);
+                setShowLogin(false);
                 setError("");
                 registerForm.resetFields();
                 loginForm.resetFields();
+                adminForm.resetFields();
               }}
               className="text-blue-200 text-sm"
             >
-              I already have an account
+              Admin login
             </Checkbox>
           </div>
 
